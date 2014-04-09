@@ -1,9 +1,13 @@
 from nltk.stem.porter import *
-import getopt, json, math, heapq, sys, string
+import getopt, json, math, heapq, sys, string, os
 from nltk.corpus import stopwords
 
 sys.path.append("./ET/elementtree/")
 import ElementTree as ET
+
+TITLE_WEIGHT = 0.8
+DESCRIPTION_WEIGHT = 0.2
+
 #######################################################################
 # Read query - execute query - output result
 #######################################################################
@@ -15,21 +19,27 @@ def search():
 	tags = root.getiterator()
 
 	# read the relevant tags
-	file_string = ''
+	title_string = ''
+	desc_string = ''
 	for tag in tags:
-		if tag.tag == 'title' or tag.tag == 'description':
-			file_string += filter(lambda x: x in string.printable, tag.text.lower().strip().replace('relevant documents will describe', ''))
+		if tag.tag == 'title' :
+			# filter non-ascii characters
+			title_string = filter(lambda x: x in string.printable, tag.text.lower().strip())
+		elif tag.tag == 'description':
+			desc_string = filter(lambda x: x in string.printable, tag.text.lower().strip().replace('relevant documents will describe', ''))
 
 	query_file.close()
-	print file_string
-	query = parse_query(file_string)
+	query = {}
+	query['title'] = parse_query(title_string)
+	query['desc'] = parse_query(desc_string)
 	result = evaluate(query)
 	output(result)
 	query_file.close()
 
 
 def output(result):
-	out_file.write(' '.join(map(str, result)) + '\n')
+	result = [x[0] for x in map(os.path.splitext, result)]
+	out_file.write(' '.join(result) + '\n')
 
 def parse_query(raw):
 	# after tokenising the query,
@@ -52,9 +62,13 @@ def parse_query(raw):
 
 def evaluate(query):
 	master = {}
-	for q in query:
+	for q in query['title']:
 		postings = lookup(q)
 		master = merge(master, postings, q)
+	for q in query['desc']:
+		postings = lookup(q)
+		master = merge(master, postings, q)
+
 	# master dict is now of the following structure:
 	# {
 	#    docID1: {token1: tf1, token2: tf2, ...}
@@ -63,9 +77,13 @@ def evaluate(query):
 	
 	top = []
 	for doc in master:
-		# candidate is a tuple (cosine similarity score, docID)
-		candidate = (- cos_sim(query, master[doc], DOC_LENGTHS[doc]), doc)
-		heapq.heappush(top, candidate)
+		title = - cos_sim(query['title'], master[doc], DOC_LENGTHS[doc], 'title')
+		desc = - cos_sim(query['desc'], master[doc], DOC_LENGTHS[doc], 'desc')
+		weighted_score = title * TITLE_WEIGHT + desc * (1 - TITLE_WEIGHT)
+		if weighted_score != 0:
+			# each candidate is a tuple (cosine similarity score, docID)
+			print doc, - weighted_score
+			heapq.heappush(top, (weighted_score, doc))
 
 	result = []
 	while top:
@@ -88,15 +106,15 @@ def compare(doc1, doc2):
 # cosine similarity caocluated by ltc.lnc
 # note that doc_length is computed during indexing
 # for better performance in normalisation
-def cos_sim(query, doc, doc_length):
+def cos_sim(query, doc, doc_length, section):
 	dot_product = 0
 	q_sum_of_sqr = 0
 	for token, q_rawtf in query.iteritems():
 		q_w = float(1) + math.log(q_rawtf, 10)
-		if token not in doc:
+		if token not in doc or doc[token][section] == 0:
 			d_w = 0
 		else:
-			d_tf = float(1) + math.log(doc[token], 10)
+			d_tf = float(1) + math.log(doc[token][section], 10)
 			d_df = freq(token)
 			d_idf = math.log(float(COLLECTION_SIZE) / d_df, 10) if d_df != 0 else 1
 			d_w = d_tf*d_idf

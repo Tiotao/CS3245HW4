@@ -6,6 +6,7 @@ from os import walk
 import sys, json, getopt, math, string
 sys.path.append("./ET/elementtree/")
 import ElementTree as ET
+
 #######################################################################
 # Sample command:
 #	python index.py -i D:\training\ -d dictionary.txt -p postings.txt
@@ -101,18 +102,28 @@ def generate_posting_array_dict(filenames):
 	for filename in filenames:
 		# genearate tokenized and stemmed (stopwords and numbers can be filtered by option) from a file
 		try:
-			tokens = generate_tokens(str(filename))
+			title, desc = generate_tokens(str(filename))
 			# store tokens and filnames into posting_array_dict
 			# append filenames at end of the posting array if token key existed in the dictionary
-			for t in tokens:
+			for t in title:
 				key = str(t)
 				if key in posting_array_dict:
 					if filename in posting_array_dict[key]:
-						posting_array_dict[key][filename] = posting_array_dict[key][filename] + 1
+						posting_array_dict[key][filename]['title'] = posting_array_dict[key][filename]['title'] + 1
 					if not filename in posting_array_dict[key]:
-						posting_array_dict[key][filename] = 1
+						posting_array_dict[key][filename] = {'title': 1, 'desc': 0}
 				else:
-					posting_array_dict[key] = {filename: 1}
+					posting_array_dict[key] = {filename: {'title': 1, 'desc': 0}}
+
+			for t in desc:
+				key = str(t)
+				if key in posting_array_dict:
+					if filename in posting_array_dict[key]:
+						posting_array_dict[key][filename]['desc'] = posting_array_dict[key][filename]['desc'] + 1
+					if not filename in posting_array_dict[key]:
+						posting_array_dict[key][filename] = {'title': 0, 'desc': 1}
+				else:
+					posting_array_dict[key] = {filename: {'title': 0, 'desc': 1}}
 
 			curr += 1
 			sys.stdout.write("\rindexing: " + ("%.2f" % (100.0 * curr / total)) + '%')
@@ -130,7 +141,8 @@ def generate_document_vector_length(filenames, dict):
 	for filename in filenames:
 		try:
 			axis = {}
-			tokens = generate_tokens(str(filename))
+			title, desc = generate_tokens(str(filename))
+			tokens = title + desc
 			for token in tokens:
 				if token in axis:
 					axis[token] += 1
@@ -156,10 +168,10 @@ def generate_document_vector_length(filenames, dict):
 
 # generate array of tokens from file
 def generate_tokens(filename):
-	words = tokenize_sentences(filename)
-	tokens = stemming_words(words)
-	tokens = filter_stopwords(tokens)
-	return tokens
+	title, desc = tokenize_sentences(filename)
+	title_tokens = filter_stopwords(stemming_words(title))
+	desc_tokens = filter_stopwords(stemming_words(desc))
+	return (title_tokens, desc_tokens)
 
 # tokenize sentences in a file into array of words
 def tokenize_sentences(filename):
@@ -170,18 +182,29 @@ def tokenize_sentences(filename):
 	tags = root.getiterator('str')
 
 	# read the relevant tags
-	file_string = ''
+	title_string = ''
+	desc_string = ''
 	for tag in tags:
-		if tag.get('name')  == 'Title' or tag.get('name') == 'Abstract':
-			file_string += filter(lambda x: x in string.printable, tag.text.lower().strip().replace('relevant documents will describe', ''))
+		if tag.get('name')  == 'Title' :
+			title_string = filter(lambda x: x in string.printable, tag.text.lower().strip())
+
+		elif tag.get('name') == 'Abstract':
+			desc_string = filter(lambda x: x in string.printable, tag.text.lower().strip().replace('relevant documents will describe', ''))
 
 	f.close()
 
-	sentences = sent_tokenize(file_string)
-	words = []
+	sentences = sent_tokenize(title_string)
+	title_words = []
 	for s in sentences:
-		words = words + word_tokenize(s)
-	return words
+		title_words = title_words + word_tokenize(s)
+
+	sentences = sent_tokenize(desc_string)
+	desc_words = []
+	for s in sentences:
+		desc_words = desc_words + word_tokenize(s)
+
+	
+	return (title_words, desc_words)
 
 stemmer = PorterStemmer()
 def stemming_words(words):
