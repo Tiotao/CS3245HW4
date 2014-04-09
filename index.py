@@ -142,19 +142,26 @@ def generate_document_vector_length(filenames, dict):
 		try:
 			axis = {}
 			title, desc = generate_tokens(str(filename))
-			tokens = title + desc
-			for token in tokens:
+			for token in title:
 				if token in axis:
-					axis[token] += 1
+					axis[token]['title'] += 1
 				else:
-					axis[token] = 1
-			sum_of_squared = 0
+					axis[token] = {'title': 1, 'desc': 0}
+
+			for token in desc:
+				if token in axis:
+					axis[token]['desc'] += 1
+				else:
+					axis[token] = {'desc': 1, 'title': 0}
+			sum_of_squared_title = 0
+			sum_of_squared_desc = 0
 			for token, freq in axis.iteritems():
-				d_tf = float(1) + math.log(freq, 10)
-				d_df = len(dict[token])
-				d_idf = math.log(float(total) / d_df, 10) if d_df != 0 else 1
-				sum_of_squared += (d_tf * d_idf) ** 2
-			lengths_dict[filename] = math.sqrt(sum_of_squared)
+				d_tf_title = float(1) + math.log(freq['title'], 10) if freq['title'] != 0 else 0
+				d_tf_desc = float(1) + math.log(freq['desc'], 10) if freq['desc'] != 0 else 0
+				d_idf = 1
+				sum_of_squared_title += (d_tf_title * d_idf) ** 2
+				sum_of_squared_desc += (d_tf_desc * d_idf) ** 2
+			lengths_dict[filename] = {'title': math.sqrt(sum_of_squared_title), 'desc': math.sqrt(sum_of_squared_desc) }
 			curr += 1
 			sys.stdout.write("\rprocessing: " + ("%.2f" % (100.0 * curr / total)) + '%')
 			sys.stdout.flush()

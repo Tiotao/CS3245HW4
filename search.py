@@ -6,7 +6,6 @@ sys.path.append("./ET/elementtree/")
 import ElementTree as ET
 
 TITLE_WEIGHT = 0.8
-DESCRIPTION_WEIGHT = 0.2
 
 #######################################################################
 # Read query - execute query - output result
@@ -47,7 +46,6 @@ def parse_query(raw):
 	# for later calculation of query tf
 	query = raw.strip().split()
 	query = [normalise_word(w) for w in filter_stopwords(query)]
-	print query
 	query_dict = {}
 	for token in query:
 		if token in query_dict:
@@ -80,16 +78,14 @@ def evaluate(query):
 		title = - cos_sim(query['title'], master[doc], DOC_LENGTHS[doc], 'title')
 		desc = - cos_sim(query['desc'], master[doc], DOC_LENGTHS[doc], 'desc')
 		weighted_score = title * TITLE_WEIGHT + desc * (1 - TITLE_WEIGHT)
-		if weighted_score != 0:
+		if weighted_score < 0:
 			# each candidate is a tuple (cosine similarity score, docID)
-			print doc, - weighted_score
-			heapq.heappush(top, (weighted_score, doc))
+			heapq.heappush(top, (weighted_score*1000, doc))
 
 	result = []
 	while top:
 		candidate = heapq.heappop(top)
 		result.append(candidate)
-	sorted(result,  cmp=compare)
 	return [x[1] for x in result]
 
 # sort the candidates first by score, then by docID
@@ -107,20 +103,25 @@ def compare(doc1, doc2):
 # note that doc_length is computed during indexing
 # for better performance in normalisation
 def cos_sim(query, doc, doc_length, section):
+	if doc_length[section] == 0:
+		return 0
 	dot_product = 0
 	q_sum_of_sqr = 0
 	for token, q_rawtf in query.iteritems():
-		q_w = float(1) + math.log(q_rawtf, 10)
+		q_tf = float(1) + math.log(q_rawtf, 10)
+		q_df = freq(token)
+		q_idf = math.log(float(COLLECTION_SIZE) / q_df, 10) if q_df != 0 else 1
+		q_w = q_tf * q_idf
 		if token not in doc or doc[token][section] == 0:
 			d_w = 0
 		else:
 			d_tf = float(1) + math.log(doc[token][section], 10)
 			d_df = freq(token)
-			d_idf = math.log(float(COLLECTION_SIZE) / d_df, 10) if d_df != 0 else 1
+			d_idf = 1
 			d_w = d_tf*d_idf
 		dot_product += q_w * d_w
 		q_sum_of_sqr += q_w ** 2
-	return float(dot_product) / doc_length / math.sqrt(q_sum_of_sqr)
+	return float(dot_product) / doc_length[section] / math.sqrt(q_sum_of_sqr)
 
 #######################################################################
 # Set operations
