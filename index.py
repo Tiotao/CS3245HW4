@@ -4,8 +4,7 @@ from nltk.corpus import stopwords
 
 from os import walk
 import sys, json, getopt, math, string
-sys.path.append("./ET/elementtree/")
-import ElementTree as ET
+import xml.etree.ElementTree as ET
 
 #######################################################################
 # Sample command:

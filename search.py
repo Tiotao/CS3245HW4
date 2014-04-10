@@ -1,9 +1,8 @@
 from nltk.stem.porter import *
 import getopt, json, math, heapq, sys, string, os
 from nltk.corpus import stopwords
+import xml.etree.ElementTree as ET
 
-sys.path.append("./ET/elementtree/")
-import ElementTree as ET
 
 TITLE_WEIGHT = 0.8
 
