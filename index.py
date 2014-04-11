@@ -99,11 +99,14 @@ def generate_posting_array_dict(filenames):
 	# totol length of files to be processed 
 	total = len(filenames)
 	for filename in filenames:
-		# genearate tokenized and stemmed (stopwords and numbers can be filtered by option) from a file
+		# genearate tokenized and stemmed from a file
 		try:
 			title, desc = generate_tokens(str(filename))
 			# store tokens and filnames into posting_array_dict
 			# append filenames at end of the posting array if token key existed in the dictionary
+			# title and desc are handle separately.
+			# While the following loops might be abstracted into a separate method,
+			# but it is verbose for easier customisation
 			for t in title:
 				key = str(t)
 				if key in posting_array_dict:
@@ -128,7 +131,7 @@ def generate_posting_array_dict(filenames):
 			sys.stdout.write("\rindexing: " + ("%.2f" % (100.0 * curr / total)) + '%')
 			sys.stdout.flush()
 		except ET.ParseError:
-			pass
+			pass # no-op on illegal xml
 	return posting_array_dict
 
 def generate_document_vector_length(filenames, dict):
@@ -139,6 +142,7 @@ def generate_document_vector_length(filenames, dict):
 
 	for filename in filenames:
 		try:
+			# calculate word count used for term frequency
 			axis = {}
 			title, desc = generate_tokens(str(filename))
 			for token in title:
@@ -152,6 +156,8 @@ def generate_document_vector_length(filenames, dict):
 					axis[token]['desc'] += 1
 				else:
 					axis[token] = {'desc': 1, 'title': 0}
+
+			# calculate document lengths, notice that we are using lnc for documents
 			sum_of_squared_title = 0
 			sum_of_squared_desc = 0
 			for token, freq in axis.iteritems():
@@ -165,7 +171,7 @@ def generate_document_vector_length(filenames, dict):
 			sys.stdout.write("\rprocessing: " + ("%.2f" % (100.0 * curr / total)) + '%')
 			sys.stdout.flush()
 		except ET.ParseError:
-			pass
+			pass  # no-op on illegal xml
 	return lengths_dict
 
 #######################################################################

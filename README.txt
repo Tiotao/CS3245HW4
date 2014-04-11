@@ -3,6 +3,7 @@ This is the README file for A0099314Y's and A0099332Y's submission
 == General notes about this assignment ==
 
 The strategy for this submission is very similar to HW3, as it is based on tf-idf model (lnc.ltc).
+Tokens are stemmed and stopwords eliminated.
 
 Indexing:  The strategy for indexing is very similar to HW3, but instead of treating each document
 as a unstructured data, we focus on the Title and Abstract zones. Each zone is indexed separately,
@@ -30,13 +31,16 @@ After the cosine similarities for title query and description query have been co
 the respecitve weighting to the scores, so the weighted sum becomes the score for this particular
 document.
 
-In this team project, A0099332Y is in charge of indexing and A0099314Y for searching implementation.
+Possible enhancements include query expansion. Once we've obtained the preliminary results, we take
+the top 10% most relevant documents and concatinate them to form a new query. Then process the new
+query in the same algorithm as the initial round, and output the result as the final list of
+relevant documents.
 
+In this team project, A0099332Y is in charge of indexing and A0099314Y for searching implementation.
 
 == Files included with this submission ==
 
 .
-|-- ET .................... ElementTree package
 |-- README.txt ............ this file
 |-- dictionary.txt ........ dictonary for all documents
 |-- index.py .............. python script to index all documents

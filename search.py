@@ -31,9 +31,29 @@ def search():
 	query['title'] = parse_query(title_string)
 	query['desc'] = parse_query(desc_string)
 	result = evaluate(query)
+
+	# Query expansion, not used, kept for documentation purposes.
+	# We take the top 10% of the results as secound round of query,
+	# concatinate them to form a new query and perform the same 
+	# evaluation using similar tf-idf approach.
+	# 
+	# top_hits = result[:len(A)/10]
+	# expanded_query = query_expansion(top_hits)
+	# result = evaluate(expanded_query)
+
 	output(result)
 	query_file.close()
 
+# in query expansion, we are given a list of docIDs and concatinate them 
+# to form a new query.
+# Not fully implemented, kept for documentation purposes
+# def query_expansion(list_of_docIDs):
+# 	query = {'title': {}, 'desc' : {}}
+# 	for doc in list_of_docIDs:
+#		for each token in doc['title']:
+#		    query['title'][token] += 1
+#		for each token in doc['doc']:
+#		    query['doc'][token] += 1
 
 def output(result):
 	result = [x[0] for x in map(os.path.splitext, result)]
@@ -59,6 +79,7 @@ def parse_query(raw):
 
 def evaluate(query):
 	master = {}
+	# we merge the postings list together.
 	for q in query['title']:
 		postings = lookup(q)
 		master = merge(master, postings, q)
@@ -66,39 +87,27 @@ def evaluate(query):
 		postings = lookup(q)
 		master = merge(master, postings, q)
 
-	# master dict is now of the following structure:
-	# {
-	#    docID1: {token1: tf1, token2: tf2, ...}
-	#    ...
-	# }
-	
+	# calculates the consine similarity for both title and desc,
+	# the final weighted score is the weighted sum of title and desc, depending
+	# on constant TITLE_WEIGHT
 	top = []
 	for doc in master:
 		title = - cos_sim(query['title'], master[doc], DOC_LENGTHS[doc], 'title')
 		desc = - cos_sim(query['desc'], master[doc], DOC_LENGTHS[doc], 'desc')
+		# TITLE_WEIGHT and weight of description should sum up to 1
 		weighted_score = title * TITLE_WEIGHT + desc * (1 - TITLE_WEIGHT)
 		if weighted_score < 0:
 			# each candidate is a tuple (cosine similarity score, docID)
 			heapq.heappush(top, (weighted_score*1000, doc))
 
+	# pop out sorted results
 	result = []
 	while top:
 		candidate = heapq.heappop(top)
 		result.append(candidate)
 	return [x[1] for x in result]
 
-# sort the candidates first by score, then by docID
-def compare(doc1, doc2):
-	if (doc1[0] == doc2[0]):
-		return cmp(doc1[1], doc2[1])
-	elif doc1[0] < doc2[0]:
-		return -1
-	elif doc1[0] < doc2[0]:
-		return 0
-	else:
-		return 1
-
-# cosine similarity caocluated by ltc.lnc
+# cosine similarity caocluated by lnc.ltc
 # note that doc_length is computed during indexing
 # for better performance in normalisation
 def cos_sim(query, doc, doc_length, section):
@@ -107,17 +116,16 @@ def cos_sim(query, doc, doc_length, section):
 	dot_product = 0
 	q_sum_of_sqr = 0
 	for token, q_rawtf in query.iteritems():
+		# ltc calculation for query
 		q_tf = float(1) + math.log(q_rawtf, 10)
 		q_df = freq(token)
 		q_idf = math.log(float(COLLECTION_SIZE) / q_df, 10) if q_df != 0 else 1
 		q_w = q_tf * q_idf
+		# lnc calculation for doc
 		if token not in doc or doc[token][section] == 0:
 			d_w = 0
 		else:
-			d_tf = float(1) + math.log(doc[token][section], 10)
-			d_df = freq(token)
-			d_idf = 1
-			d_w = d_tf*d_idf
+			d_w = float(1) + math.log(doc[token][section], 10)
 		dot_product += q_w * d_w
 		q_sum_of_sqr += q_w ** 2
 	return float(dot_product) / doc_length[section] / math.sqrt(q_sum_of_sqr)
@@ -127,10 +135,7 @@ def cos_sim(query, doc, doc_length, section):
 #######################################################################
 
 def merge(master, second, token):
-	"""
-	merge a second postings into the master postings list
-	"""
-	
+	# merge a second postings into the master postings list	
 	for doc, tf in second.iteritems():
 		if doc in master:
 			master[doc][token] = tf
